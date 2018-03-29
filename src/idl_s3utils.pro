@@ -36,15 +36,11 @@ libNamePyc = libName+'.pyc'
 
 foreach dir, dirLocations do begin
    
-  file = filepath(libNamePy, $
-    ROOT=dir, $
-    SUBDIR=subdirs)    
-  if (file_test(file)) then libDir = file_dirname(file)
-  
-  file = filepath(libNamePyc, $
-    ROOT=dir, $
-    SUBDIR=subdirs)
-  if (file_test(file)) then libDir = file_dirname(file)
+  search_path = expand_path('+'+dir, /ALL_DIR)
+  foreach testFile, [libNamePy, libNamePyc] do begin
+    tFile = file_which(search_path, testFile)
+    if (tFile ne '') then libDir = file_dirname(tFile) 
+  endforeach
   
 endforeach
 
