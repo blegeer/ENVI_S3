@@ -18,13 +18,18 @@ boto and boto3 modules
   /home/ec2-user$ python --version
   
  python
- >>> import boto
- >>> import boto3
+ 
+ ```python
+ import boto
+ import boto3
+ ```
  
    if either import fails, install using pip
+   ```
    pip install boto
    pip install boto3
-
+   ```
+   
 2. Set your AWS envirnonment variables to the values specific for your account
 
 AWS_SECRET_ACCESS_KEY
@@ -42,9 +47,9 @@ These keys determine the buckets that you can access
 4. Verify the extensions directory has a new folder named envi_s3 with three subfolders
     envi_s3
       |
-      - bitmaps
-      - python_lib
-      - save
+      bitmaps
+      python_lib
+      save
       
 5. Restart ENVI
 6. Click on the ENVI AWS Explorer tool in extensions
@@ -53,8 +58,11 @@ These keys determine the buckets that you can access
 To build from source. 
 1. Start IDL 
 2. edit the file locations in src\buildsave.pro
-3. IDL> cd, 'c:\<yourdir>\envi_s3\src'
-4. IDL> @buildsave
+3. execute the IDL commands
+```python
+cd, 'c:\<yourdir>\envi_s3\src'
+@buildsave
+```
 
 This will create the IDL save file in envi_s3\src and the zip file at the envi_s3 root location
 
