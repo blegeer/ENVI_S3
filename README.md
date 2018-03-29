@@ -68,7 +68,7 @@ These keys determine the buckets that you can access
 5. Restart ENVI
 6. Click on the ENVI AWS Explorer tool in extensions
 
-## Bulid from source
+## Build from source
 To build from source. 
 1. Start IDL 
 2. edit the file locations in src\buildsave.pro
