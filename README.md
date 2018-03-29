@@ -10,6 +10,8 @@ ENVI plugin to explore AWS S3 buckets and open contents in ENVI 5.x
 - Preview text files
 - Download collects or single images
 
+![Alt text](https://github.com/blegeer/ENVI_S3/blob/master/screenshots/ENVIS3ExplorerScreenshot.png "Explorer Screenshot")
+
 ## Ideal Install
 This plugin will works best when run on an AWS EC2 instance in the same region as the buckets being searched. Browsing collects will work fine on non-AWS instances. Downloading large datasets when not on an AWS EC2 instance is slower and could incur costs to your account.  
 
