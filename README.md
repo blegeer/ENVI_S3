@@ -49,6 +49,16 @@ These keys determine the buckets that you can access
 5. Restart ENVI
 6. Click on the ENVI AWS Explorer tool in extensions
 
+## Bulid from source
+To build from source. 
+1. Start IDL 
+2. edit the file locations in src\buildsave.pro
+3. IDL> cd, 'c:\<yourdir>\envi_s3\src'
+4. IDL> @buildsave
+
+This will create the IDL save file in envi_s3\src and the zip file at the envi_s3 root location
+
+
 
 
    
