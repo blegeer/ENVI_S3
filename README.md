@@ -4,6 +4,7 @@ ENVI plugin to explore AWS S3 buckets and open contents in ENVI 5.x
 ## Capabilities
 - Displays AWS S3 buckets that are accessible via account credentials
 - Allows access to public S3 buckets such as the Landsat public dataset (s3://landsat-pds)
+- Allows a user to enter other credentials or to submit a role for access to specfic buckets (AssumeRole)
 - Open any single image file that is supported by ENVI 
 - Open a "collect" into ENVI
 - Preview small image files 
@@ -11,12 +12,14 @@ ENVI plugin to explore AWS S3 buckets and open contents in ENVI 5.x
 - Download collects or single images
 
 ![Alt text](https://github.com/blegeer/ENVI_S3/blob/master/screenshots/ENVIS3ExplorerScreenshot.png "Explorer Screenshot")
+![Alt text](https://github.com/blegeer/ENVI_S3/blob/master/screenshots/ENVIS3ExplorerSettingsScreenshot.png "Explorer Screenshot")
 
 ## Ideal Install
 This plugin will works best when run on an AWS EC2 instance in the same region as the buckets being searched. Browsing collects will work fine on non-AWS instances. Downloading large datasets when not on an AWS EC2 instance is slower and could incur costs to your account.  
 
 ## Requirements
 - ENVI 5.3.1 (tested) not testing on ENVI 5.4 or 5.5
+- Tested on Windows, lightly tested on Unix
 - A working IDL->Python bridge - see the Harris Geospatial Documentation for instructions (http://www.harrisgeospatial.com/docs/Python.html)
 - Python 2.7
 - boto and boto3 modules
@@ -46,8 +49,8 @@ This plugin will works best when run on an AWS EC2 instance in the same region a
    
 2. Set your AWS envirnonment variables to the values specific for your account
 
-AWS_SECRET_ACCESS_KEY
-AWS_ACCESS_KEY
+- AWS_SECRET_ACCESS_KEY
+- AWS_ACCESS_KEY
 
 These keys determine the buckets that you can access
 
@@ -67,6 +70,11 @@ These keys determine the buckets that you can access
       
 5. Restart ENVI
 6. Click on the ENVI AWS Explorer tool in extensions
+
+## Notes / Dependencies
+The AWS functionality depends on interaction of IDL with an external python module (cso_s3utils.py). The code will search for this library in the system and user extensions directories. If the plug-in is not working - check this first. 
+The code loads custom bitmaps from the extensions directories as well. this will not cause code failure. The UI will not have the bucket locations. 
+
 
 ## Build from source
 To build from source. 
