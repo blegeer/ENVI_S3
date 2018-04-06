@@ -29,10 +29,10 @@ bitmapFile = ''
 foreach dir, dirLocations do begin
   if (~bitmapName.endswith('.png')) then bitmapName+='.png'
   
-  file = filepath(bitmapName, $
-    ROOT=dir, $
-    SUBDIR=subdirs)
-  if (file_test(file)) then bitmapFile = file
+  search_path = expand_path('+'+dir, /ALL_DIR)
+  file = file_which(search_path, bitmapName)
+  if (file ne '') then bitmapFile=file
+  
 endforeach
 
 if (bitmapFile ne '') then begin
@@ -61,16 +61,16 @@ return, goodAWS
 
 END
 
-PRO OpenS3CollectInENVI, bucketName, folderName
+PRO OpenS3CollectInENVI, bucketName, folderName,ACCESS_KEY=access_key, SECRET_KEY=secret_key, TOKEN=token
 
 compile_opt idl2
 
 e = envi(/current)
   
   
-  tifFiles = downloadCollect(bucketName, folderName, OUTPUT_DIR=output_dir)
-  
-  
+  tifFiles = downloadCollect(bucketName, folderName, $
+     OUTPUT_DIR=output_dir, ACCESS_KEY=access_key, SECRET_KEY=secret_key, TOKEN=token)
+    
   output_path = filepath('', root=output_dir, subdir=strsplit(folderName,'/',/EXTRACT))
   
   ; if no TIF files where found - prompt to select
@@ -132,13 +132,14 @@ foreach tempFile, fileNames do begin
   
 END
 
-PRO OpenS3InENVI, bucketName, itemName
+PRO OpenS3InENVI, bucketName, itemName, ACCESS_KEY=access_key, SECRET_KEY=secret_key, TOKEN=token
 
 compile_opt idl2
 
 e = envi(/current)
 
-tempfile = downloadItem(bucketName, itemName, ERROR = errMsg)
+tempfile = downloadItem(bucketName, itemName, ERROR = errMsg, $
+  ACCESS_KEY=access_key, SECRET_KEY=secret_key, TOKEN=token)
 if (errMsg[0] eq '') then begin
   OpenFilesInEnvi, tempfile
 endif
@@ -146,7 +147,8 @@ endif
 END
 
 
-FUNCTION downloadItem, bucketName, itemName, OUTPUT_DIR=output_dir, ERROR=errMsg
+FUNCTION downloadItem, bucketName, itemName, OUTPUT_DIR=output_dir, ERROR=errMsg, $
+  ACCESS_KEY=access_key, SECRET_KEY=secret_key,TOKEN=token
 
 compile_opt idl2
 errMsg = ''
@@ -159,7 +161,7 @@ endif else begin
   outFile = filepath(file_basename(itemName), ROOT=output_dir)
 endelse
 
-gets3file, bucketName, itemName, outFile, ERROR = errMsg
+gets3file, bucketName, itemName, outFile, ERROR = errMsg, ACCESS_KEY=access_key, SECRET_KEY=secret_key, TOKEN=token
 if (errMsg[0] ne '') then begin
   print, 'Error downloading file'
   outFile = ''
@@ -170,7 +172,8 @@ return, outFile
 
 END
 
-FUNCTION downloadCollect, bucketName, folderName, OUTPUT_DIR=output_dir, ERROR=errMsg
+FUNCTION downloadCollect, bucketName, folderName, OUTPUT_DIR=output_dir, ERROR=errMsg, $
+  ACCESS_KEY=access_key, SECRET_KEY=secret_key, TOKEN=token
 
 compile_opt idl2
 errMsg=''
@@ -181,7 +184,8 @@ if (output_dir eq !NULL) then begin
     output_dir = e.preferences["directories and files:temporary directory"].value
 endif
 
-gets3folder, bucketName, folderName, output_dir, ERROR = errMsg
+gets3folder, bucketName, folderName, output_dir, ERROR = errMsg, $
+  ACCESS_KEY=access_key, SECRET_KEY=secret_key, TOKEN=token
 if (errMsg[0] ne '') then begin
   print, 'ERROR getting s3 folder'
   return,''
@@ -254,7 +258,8 @@ compile_opt idl2
 widget_control, event.top, GET_UVALUE = cData
 i = cData.contextItemInfo
 widget_control, cData.statusText, SET_VALUE = 'Downloading Collect'
-OpenS3CollectInENVI, i.bucketName, i.folderName
+OpenS3CollectInENVI, i.bucketName, i.folderName, $
+  ACCESS_KEY=cData.awsAccess, SECRET_KEY=cData.awsSecret, TOKEN=cData.awsToken
 
 
 
@@ -273,6 +278,8 @@ gTopBase = widget_info(cData.topBase, /GEOMETRY)
 gTop = widget_info(event.top, /GEOMETRY)
 gStatus= widget_info(cData.statusBase, /GEOMETRY)
 
+gSettings = widget_info(cData.settingsBase, /GEOMETRY)
+widget_control, cData.settingsBase, XOFFSET = gTop.scr_xsize-(2*gTop.margin)-gSettings.scr_xsize-(2*gsettings.margin)
 
 newX = event.x - (2*gTop.xpad)
 newY = event.y - (2*gTop.ypad) - gTopBase.scr_ysize - gStatus.scr_ysize
@@ -317,15 +324,22 @@ compile_opt idl2
        s3address = 'S3://'+i.bucketName
   
        s3info = parses3address(s3address)
-       folderNames = gets3FolderList(s3Info.bucketName, s3Info.folderName)
+       if (s3info eq !NULL) then return
+       
+       folderNames = gets3FolderList(s3Info.bucketName, s3Info.folderName, ERROR=errMsg, $
+        ACCESS_KEY=cData.awsAccess, SECRET_KEY=cData.awsSecret, TOKEN=cData.awsToken)
       
-       foreach folder, folderNames do begin
+       if (folderNames ne !NULL) then begin
+        foreach folder, folderNames do begin
           node = widget_tree(event.id, VALUE = folder, /FOLDER,  $
              UVALUE = {bucketName:s3info.bucketName, folderName:folder}, $
              EVENT_PRO='ENVIS3_FolderNode')
 
-       endforeach
-       widget_control, event.id, /SET_TREE_EXPANDED
+        endforeach
+        widget_control, event.id, /SET_TREE_EXPANDED
+       endif else begin
+        widget_control, cData.statusText, SET_VALUE='Error getting folders'
+       endelse
        
      ENDIF
    ENDIF
@@ -340,7 +354,8 @@ compile_opt idl2
 
   i= cData.contextItemInfo
   print, 'Previewing Item '+i.itemName
-  txtFile = downloadItem(i.bucketName, i.itemName, ERROR=errMsg)
+  txtFile = downloadItem(i.bucketName, i.itemName, ERROR=errMsg,$
+     ACCESS_KEY=cData.awsAccess, SECRET_KEY=cData.awsSecret, TOKEN=cData.awsToken)
   if (errMsg[0] eq '') then begin
     xdisplayfile, txtFile
   endif else begin
@@ -358,7 +373,8 @@ compile_opt idl2
   
   i= cData.contextItemInfo
   print, 'Previewing Item '+i.itemName
-  img = downloadItem(i.bucketName, i.itemName, ERROR = errMsg)
+  img = downloadItem(i.bucketName, i.itemName, ERROR = errMsg, $
+    ACCESS_KEY=cData.awsAccess, SECRET_KEY=cData.awsSecret, TOKEN=cData.awsToken)
   if (errMsg[0] eq '') then begin
     i = image(img, TITLE=file_basename(i.itemName), $
         WINDOW_TITLE=file_basename(i.itemName))
@@ -379,7 +395,8 @@ compile_opt idl2
   if (outDir eq '') then return
 
   widget_control, cData.statusText, SET_VALUE='Downloading Collect...'
-  outfile = downloadCollect(i.bucketName, i.folderName, OUTPUT_DIR=outDir, ERROR=errMsg)
+  outfile = downloadCollect(i.bucketName, i.folderName, OUTPUT_DIR=outDir, ERROR=errMsg, $
+    ACCESS_KEY=cData.awsAccess, SECRET_KEY=cData.awsSecret, TOKEN=cData.awsToken)
   if (errMsg[0] eq '') then begin
     widget_control, cData.statusText, SET_VALUE='Download Complete'
   
@@ -403,7 +420,8 @@ compile_opt idl2
   outDir = dialog_pickfile(TITLE = 'Select Output Root Directory', /DIR)
   if (outDir eq '') then return
   
-  outfile = downloadItem(i.itemName, i.bucketName, OUTPUT_DIR=outDir, ERROR=errMsg)
+  outfile = downloadItem(i.bucketName, i.itemName, OUTPUT_DIR=outDir, ERROR=errMsg, $
+    ACCESS_KEY=cData.awsAccess, SECRET_KEY=cData.awsSecret, TOKEN=cData.awsToken)
   if (errMsg[0] eq '') then begin
     a = dialog_message('Download Complete')
   endif else begin
@@ -419,7 +437,7 @@ compile_opt idl2
   widget_control, event.top, GET_UVALUE = cData
   i= cData.contextItemInfo
   print, 'Opening Item '+i.itemName+' in ENVI'
-  Opens3InENVI, i.bucketName, i.itemName
+  Opens3InENVI, i.bucketName, i.itemName, ACCESS_KEY=cData.awsAccess, SECRET_KEY=cData.awsSecret, TOKEN=cData.awsToken
 
 END
 
@@ -439,7 +457,8 @@ compile_opt idl2
   endif else begin
     if (event.clicks eq 2) then begin
       widget_control, cData.statusText, SET_VALUE='Getting Data and Opening in ENVI'
-      Opens3InENVI, i.bucketName, i.itemName
+      Opens3InENVI, i.bucketName, i.itemName, $
+        ACCESS_KEY=cData.awsAccess, SECRET_KEY=cData.awsSecret, TOKEN=cData.awsToken
       widget_control, cData.statusText, SET_VALUE='Ready'
      endif
   endelse
@@ -466,7 +485,10 @@ endif else begin
       
       ; build the folders first
   
-      folderNames = gets3FolderList(i.bucketName, i.folderName)
+      folderNames = gets3FolderList(i.bucketName, i.folderName, $
+         ACCESS_KEY=cData.awsAccess, SECRET_KEY=cData.awsSecret, $
+         TOKEN=cData.awsToken)
+         
       if (folderNames ne !NULL) then begin
   
         nFolders = n_elements(folderNames)
@@ -478,10 +500,13 @@ endif else begin
            ; BITMAP=getBitmap('Storage_AmazonS3_bucketwithobjects'), $
             /FOLDER)
         endforeach
-      endif
+      endif else begin
+        widget_control, cData.statusText, SET_VALUE='Error getting folders'
+      endelse
   
 
-      fileList = getS3Filelist(i.bucketName, i.folderName)
+      fileList = getS3Filelist(i.bucketName, i.folderName, $
+          ACCESS_KEY=cData.awsAccess, SECRET_KEY=cData.awsSecret, TOKEN=cData.awsToken)
       if (fileList ne !NULL) then begin
         foreach file, fileList do begin
           node = widget_tree(event.id, VALUE = file_basename(file), $
@@ -500,6 +525,13 @@ ENDELSE
 
 END
 
+PRO ENVIS3_Settings, event
+widget_control, event.top, GET_UVALUE=cData
+
+ENVIS3_SettingsUI, cData, GROUP_LEADER=event.top
+
+END
+
 PRO ENVIS3_Address, event
 
 compile_opt idl2
@@ -511,7 +543,12 @@ widget_control, cData.statusText, SET_VALUE='Opening External S3 bucket '+tmp[0]
 
 s3address = strtrim(tmp[0],2)
 s3info = parses3address(s3address)
-folderNames = gets3FolderList(s3Info.bucketName, s3Info.folderName)
+if (s3info eq !NULL) then return
+
+folderNames = gets3FolderList(s3Info.bucketName, s3Info.folderName, ERROR=errorMsg, $
+  ACCESS_KEY=cData.awsAccess, SECRET_KEY=cData.awsSecret, TOKEN=cData.awsToken)
+  
+  
 if (folderNames ne !NULL) then begin
   
   bucketID = widget_tree(cData.externalTreeNode, VALUE=s3Info.bucketName, $
@@ -532,10 +569,39 @@ if (folderNames ne !NULL) then begin
   widget_control, cData.externalTreeNode, SET_TREE_EXPANDED=1
   widget_control, cData.statusText, SET_VALUE='Ready'
   
-ENDIF
+ENDIF else begin
+   widget_control, cData.statusText, SET_VALUE='Error getting folders'
+Endelse
 
 END
 
+PRO ENVIS3_Refresh, event
+
+  compile_opt idl2
+  
+  widget_control, event.top, GET_UVALUe=cData
+  
+  ; Rebuild the tree
+  widget_control, cData.mainTreeNode, /DESTROY
+  widget_control, cData.externalTreeNode, /DESTROY
+  
+  cData.mainTreeNode = widget_tree(cData.s3Tree, VALUE='Amazon S3 User Account', $
+    BITMAP=getBitmap('Storage_AmazonS3', 32), /FOLDER)
+  cData.externalTreeNode = widget_tree(cData.s3Tree, VALUE='Amazon S3 External Accounts',$
+    BITMAP=getBitmap('Storage_AmazonS3', 32), /FOLDER)
+
+  widget_control, event.top, GET_UVALUE=cData
+  bucketNames = getBucketNames(ACCESS_KEY=cData.awsAccess, SECRET_KEY=cData.awsSecret, TOKEN=cData.awsToken)
+  if (bucketNames eq !NULL) then begin
+    msg = dialog_message('No Available S3 buckets')
+    return
+  endif
+
+
+  CreateBucketNodes, cData.mainTreeNode, bucketNames
+  widget_control, cData.mainTreeNode, /SET_TREE_EXPANDED
+
+END
 
 PRO ENVIS3Explorer
 
@@ -551,18 +617,16 @@ compile_opt idl2
 ;   
 ;endif
 
-bucketNames = getBucketNames()
-if (bucketNames eq !NULL) then begin
-  msg = dialog_message('No Available S3 buckets')
-  return
-  
-endif
+
+e = envi(/current)
+if (e eq !NULL) then e = envi()
 
 tlb = widget_base(TITLE = 'ENVI S3 Explorer', /COLUMN, /TLB_SIZE_EVENTS)
 topBase = widget_base(tlb, /ROW)
 s3AddressLabel = widget_label(topBase, VALUE = 'Additional S3 Location: ')
 s3AddressText = widget_text(topBase, /EDITABLE, XSIZE=50, YSIZE=1, VALUE='S3://', $
   EVENT_PRO = 'ENVIS3_Address')
+refreshButton = widget_button(topBase, VALUE = getBitmap('refresh',16), EVENT_PRO='ENVIS3_Refresh')
   
 treeBase = widget_base(tlb, /COLUMN)
 s3Tree = widget_tree(treeBase, EVENT_PRO='ENVIS3_Tree', $
@@ -572,8 +636,15 @@ mainTreeNode = widget_tree(s3Tree, VALUE='Amazon S3 User Account', $
 externalTreeNode = widget_tree(s3Tree, VALUE='Amazon S3 External Accounts',$ 
   BITMAP=getBitmap('Storage_AmazonS3', 32), /FOLDER) 
 
-statusBase = widget_base(tlb, /ROW)
+statusBase = widget_base(tlb)
 statusText = widget_label(statusBase, VALUE = 'Ready', /DYNAMIC_RESIZE)
+settingsBase = widget_base(statusBase, /BASE_ALIGN_RIGHT, /ALIGN_RIGHT)
+credentialsButton = widget_button(settingsBase, VALUE=filepath('gears.bmp', subdir=['resource','bitmaps']), $
+  /BITMAP, EVENT_PRO='ENVIS3_Settings', /FLAT, /ALIGN_RIGHT)
+gC = widget_info(settingsBase, /GEOM)
+gTop = widget_info(tlb, /GEOM)
+widget_control, settingsBase, XOFFSET=gTop.scr_xsize-(2*gTop.margin)-gC.scr_xsize-(2*gC.margin)
+
 ; context menus
 folderContextMenu = widget_base(tlb, /CONTEXT_MENU)
 openCollect = widget_button(folderContextMenu, VALUE='Open As Collect', EVENT_PRO='ENVIS3_OpenCollect')
@@ -588,8 +659,8 @@ previewItem = widget_button(itemContextMenu, VALUE='Preview Item as Text', EVENT
 ;actionBase = widget_base(tlb, /ROW, /FRAME)
 widget_control, tlb, /REALIZE
 
-CreateBucketNodes, mainTreeNode, bucketNames
-widget_control, mainTreeNode, /SET_TREE_EXPANDED
+
+
 
 cData = DICTIONARY()
 cData.s3AddressText = s3AddressText
@@ -602,8 +673,41 @@ cData.folderContextMenu = folderContextMenu
 cData.contextItemInfo = !NULL
 cData.statusText = statusText
 cData.statusBase = statusBase
+cData.settingsBase = settingsBase
+cData.useEnv=!TRUE
+cData.awsAccess=aKey
+Cdata.awsSecret=sKey
+cData.awsToken=''
 
 widget_control, tlb, SET_UVALUE = cData
+
+goodToCreateBuckets=!TRUE
+aKey = getenv('AWS_ACCESS_KEY_ID')
+if (aKey eq !NULL OR aKey eq '') then begin
+  a = dialog_message('Must set AWS_ACCESS_KEY_ID environment variable')
+  goodToCreateBuckets=!FALSE
+endif
+
+sKey = getenv('AWS_SECRET_ACCESS_KEY')
+if (sKey eq !NULL OR sKey eq '') then begin
+  a = dialog_message('Must set AWS_SECRET_ACCESS_KEY environment variable')
+  goodToCreateBuckets=!FALSE
+endif
+
+if (goodToCreateBuckets) then begin
+
+  bucketNames = getBucketNames(ACCESS_KEY=aKey, SECRET_KEY=sKey)
+  if (bucketNames eq !NULL) then begin
+    msg = dialog_message('No Available S3 buckets')
+    return
+  endif
+
+
+  CreateBucketNodes, mainTreeNode, bucketNames
+  widget_control, mainTreeNode, /SET_TREE_EXPANDED
+endif else begin
+  ENVIS3_SettingsUI, cData, GROUP_LEADER = tlb
+endelse
 
 
 Xmanager, 'ENVIS3Explorer', tlb, /NO_BLOCK, EVENT_HANDLER='ENVIS3_Resize'
