@@ -4,15 +4,26 @@
 from boto.s3.connection import S3Connection
 import boto.s3.connection
 from boto.s3.key import Key
+from boto.sts import STSConnection
+
+import boto3
 
 import os
 import fnmatch
 import sys
 import math
-      
+
+
+def getCredentials(arn, sname):
+
+    conn = STSConnection()
+    c = conn.assume_role(arn, sname)
+    return(c.credentials)
+
 def uploadFile(local_file, bucketName, folder,
-               accessKey=None,
-               secretKey=None,
+               accesskey=None,
+               secretkey=None,
+               token=None,
                region=None):
 
     if (region == None):
@@ -20,8 +31,9 @@ def uploadFile(local_file, bucketName, folder,
         
     try:
         conn = boto.s3.connect_to_region(region,
-            aws_access_key_id = accessKey,
-            aws_secret_access_key = secretKey,
+            aws_access_key_id = accesskey,
+            aws_secret_access_key = secretkey,
+    
             # host = 's3-website-us-east-1.amazonaws.com',
             # is_secure=True,               # uncomment if you are not using ssl
             calling_format = boto.s3.connection.OrdinaryCallingFormat()
@@ -43,10 +55,13 @@ def percent_cb(complete, total):
     sys.stdout.flush()
 
 
-def uploadFileBoto3(local_file, bucketName, key_name):
+def uploadFileBoto3(local_file, bucketName, key_name,
+                    accesskey=None, secretkey=None):
     import boto3
 
-    session = boto3.Session()
+    session = boto3.Session(aws_access_key_id=accessKey,
+                            aws_secret_access_key=secretkey)
+    
     s3_client = session.client( 's3' )
 
     try:
@@ -62,9 +77,9 @@ def uploadFileBoto3(local_file, bucketName, key_name):
         print "Error uploading: %s" % ( e )
         
 
-def uploadFileMP(local_file, bucketName, key_name, accessKey=None, secretKey=None):
+def uploadFileMP(local_file, bucketName, key_name, accesskey=None, secretkey=None):
 
-    conn = boto.connect_s3(accessKey, secretKey)
+    conn = boto.connect_s3(accesskey, secretkey)
     bucket=conn.get_bucket(bucketName)
     
     #max size in bytes before uploading in parts. between 1 and 5 GB recommended
@@ -108,7 +123,11 @@ def uploadFileMP(local_file, bucketName, key_name, accessKey=None, secretKey=Non
         k.set_contents_from_filename(local_file,cb=percent_cb, num_cb=10)
             
 
-def getS3FolderList(bucketName, folder, accessKey=None, secretKey=None):
+def getS3FolderList(bucketName, folder,
+                    accesskey=None,
+                    secretkey=None,
+                    token=None,
+                    match=None):
 
 # folder must be in the form
 # key1/key2/
@@ -116,7 +135,10 @@ def getS3FolderList(bucketName, folder, accessKey=None, secretKey=None):
 
     folderList = []
         
-    conn = S3Connection(accessKey,secretKey)
+    conn = S3Connection(aws_access_key_id=accesskey,
+                        aws_secret_access_key=secretkey,
+                        security_token=token)
+    
     bucket = conn.get_bucket(bucketName)
     nObj = 0
     for key in bucket.list(prefix=folder, delimiter='/'):
@@ -124,13 +146,25 @@ def getS3FolderList(bucketName, folder, accessKey=None, secretKey=None):
         keyName = key.name.encode('utf-8')
         if (keyName.endswith('/')):
             if (keyName != folder):
-                folderList.append(keyName)
+                if (match == None):
+                    folderList.append(keyName)
+                else:
+                    if (fnmatch.fnmatch(keyName,match)):
+                        folderList.append(keyName)
+                        #k=bucket.get_key(key.name)
+                        #print k.last_modified
+        
+
         
 
     # print "Number of Objects in "+bucketName+": "+str(nObj)
     return(folderList)
 
-def getS3FileList(bucketName, folder, accessKey=None, secretKey=None, match=None):
+def getS3FileList(bucketName, folder,
+                  accesskey=None,
+                  secretkey=None,
+                  token=None,
+                  match=None):
 
 # folder must be in the form
 # dir1/dir2/
@@ -138,7 +172,10 @@ def getS3FileList(bucketName, folder, accessKey=None, secretKey=None, match=None
 
     fileList = []
     
-    conn = S3Connection(accessKey,secretKey)
+    conn = S3Connection(aws_access_key_id=accesskey,
+                        aws_secret_access_key=secretkey,
+                        security_token=token)
+     
     bucket = conn.get_bucket(bucketName)
     nObj = 0
     for key in bucket.list(prefix=folder, delimiter='/'):
@@ -157,19 +194,30 @@ def getS3FileList(bucketName, folder, accessKey=None, secretKey=None, match=None
     return(fileList)
 
 
-def getKeyToFile(bucketName, keyName, fileName, accessKey=None, secretKey=None):
+def getKeyToFile(bucketName, keyName, fileName,
+                 accesskey=None,
+                 secretkey=None,
+                 token=None):
     
     
-    conn = S3Connection(accessKey,secretKey)
+    conn = S3Connection(aws_access_key_id=accesskey,
+                        aws_secret_access_key=secretkey,
+                        security_token=token)
+     
     bucket = conn.get_bucket(bucketName)
     key = bucket.get_key(keyName)
     key.get_contents_to_filename(fileName)
 
-def getS3Folder(bucketName, folderName, rootDir, accessKey=None, secretKey=None):
+def getS3Folder(bucketName, folderName, rootDir,
+                accesskey=None,
+                secretkey=None,
+                token=None ):
 
      
     # connect to the bucket
-    conn = boto.connect_s3(accessKey, secretKey)
+    conn = boto.connect_s3(aws_access_key_id=accesskey,
+                        aws_secret_access_key=secretkey,
+                        security_token=token)
     bucket = conn.get_bucket(bucketName)
 
     nfiles=0
@@ -191,9 +239,13 @@ def getS3Folder(bucketName, folderName, rootDir, accessKey=None, secretKey=None)
             nfiles=nfiles+1
             
 
-def getBucketNames(accessKey=None, secretKey=None):
+def getBucketNames(accesskey=None,
+                   secretkey=None,
+                   token=None):
    
-    s3 = boto.connect_s3()  
+    s3 = boto.connect_s3(aws_access_key_id=accesskey,
+                        aws_secret_access_key=secretkey,
+                        security_token=token)  
     buckets = s3.get_all_buckets()
     bucketList=[]
     for key in buckets:
@@ -224,8 +276,21 @@ def mkDirUntilDone(path,isDir):
 
     for m in reversed(dirList):
         os.mkdir(m)
-        
 
+def role_arn_to_session(**args):
+    """
+    Usage :
+        session = role_arn_to_session(
+            RoleArn='arn:aws:iam::012345678901:role/example-role',
+            RoleSessionName='ExampleSessionName')
+        client = session.client('sqs')
+    """
+    client = boto3.client('sts')
+    response = client.assume_role(**args)
+    return boto3.Session(
+        aws_access_key_id=response['Credentials']['AccessKeyId'],
+        aws_secret_access_key=response['Credentials']['SecretAccessKey'],
+        aws_session_token=response['Credentials']['SessionToken'])
  
     
     
